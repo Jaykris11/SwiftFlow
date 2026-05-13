@@ -8,27 +8,35 @@ def graph():
     print("[2] Past 30 Days")
     print("[3] Past 12 Months")
     choice = input("Select timeframe: ")
+    
     conn = connect()
+    cursor = conn.cursor(dictionary=True)
+    
     if choice == '1':
-        query = "SELECT date, SUM(totalrevenue) as rev FROM sales WHERE date >= date('now', '-7 days') GROUP BY date ORDER BY date"
+        query = "SELECT date, SUM(totalrevenue) as rev FROM sales WHERE date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) GROUP BY date ORDER BY date"
         title = "Revenue Past 7 Days"
     elif choice == '2':
-        query = "SELECT date, SUM(totalrevenue) as rev FROM sales WHERE date >= date('now', '-30 days') GROUP BY date ORDER BY date"
+        query = "SELECT date, SUM(totalrevenue) as rev FROM sales WHERE date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) GROUP BY date ORDER BY date"
         title = "Revenue Past 30 Days"
     elif choice == '3':
-        query = "SELECT strftime('%Y-%m', date) as date, SUM(totalrevenue) as rev FROM sales WHERE date >= date('now', '-1 year') GROUP BY strftime('%Y-%m', date) ORDER BY date"
+        query = "SELECT DATE_FORMAT(date, '%Y-%m') as date, SUM(totalrevenue) as rev FROM sales WHERE date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR) GROUP BY DATE_FORMAT(date, '%Y-%m') ORDER BY date"
         title = "Revenue Past 12 Months"
     else:
         print("Invalid choice")
         conn.close()
         return
-    rows = conn.execute(query).fetchall()
+        
+    cursor.execute(query)
+    rows = cursor.fetchall()
     conn.close()
+    
     if not rows:
         print("No data for timeframe")
         return
-    dates = [row['date'][-5:] for row in rows]
-    revenues = [row['rev'] for row in rows]
+        
+    dates = [row['date'][-5:] if choice != '3' else row['date'] for row in rows]
+    revenues = [float(row['rev']) for row in rows]
+    
     plt.clf()
     plt.bar(dates, revenues, color="cyan")
     plt.title(title)
@@ -40,15 +48,31 @@ def graph():
 def dashboard():
     today = datetime.now().strftime("%Y-%m-%d")
     conn = connect()
-    salestoday = conn.execute('SELECT SUM(totalrevenue) FROM sales WHERE date = ?', (today,)).fetchone()[0] or 0.0
-    costtoday = conn.execute('SELECT SUM(totalcost) FROM sales WHERE date = ?', (today,)).fetchone()[0] or 0.0
-    exptoday = conn.execute('SELECT SUM(amount) FROM expenses WHERE date = ?', (today,)).fetchone()[0] or 0.0
-    netprofit = salestoday - (costtoday + exptoday)
-    totexp = conn.execute('SELECT SUM(amount) FROM expenses').fetchone()[0] or 0.0
-    totrev = conn.execute('SELECT SUM(totalrevenue) FROM sales').fetchone()[0] or 0.0
-    totcost = conn.execute('SELECT SUM(totalcost) FROM sales').fetchone()[0] or 0.0
-    overallprofit = totrev - (totcost + totexp)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT SUM(totalrevenue) FROM sales WHERE date = %s', (today,))
+    salestoday = cursor.fetchone()[0] or 0.0
+    
+    cursor.execute('SELECT SUM(totalcost) FROM sales WHERE date = %s', (today,))
+    costtoday = cursor.fetchone()[0] or 0.0
+    
+    cursor.execute('SELECT SUM(amount) FROM expenses WHERE date = %s', (today,))
+    exptoday = cursor.fetchone()[0] or 0.0
+    
+    netprofit = float(salestoday) - (float(costtoday) + float(exptoday))
+    
+    cursor.execute('SELECT SUM(amount) FROM expenses')
+    totexp = cursor.fetchone()[0] or 0.0
+    
+    cursor.execute('SELECT SUM(totalrevenue) FROM sales')
+    totrev = cursor.fetchone()[0] or 0.0
+    
+    cursor.execute('SELECT SUM(totalcost) FROM sales')
+    totcost = cursor.fetchone()[0] or 0.0
+    
+    overallprofit = float(totrev) - (float(totcost) + float(totexp))
     conn.close()
+    
     print("\nFINANCIAL DASHBOARD")
     print("\nTODAYS STATEMENT")
     print(f"Gross Sales: {salestoday:.2f}")
@@ -58,11 +82,14 @@ def dashboard():
     print("\nOVERALL BUSINESS HEALTH")
     print(f"Lifetime Revenue: {totrev:.2f}")
     print(f"Lifetime Profit: {overallprofit:.2f}")
+    
     if totrev > 0:
         print(f"Overall Margin: {((totrev - totcost) / totrev) * 100:.1f}%")
+        
     wantgraph = input("\nView Sales Graph? (y/n): ").strip().lower()
     if wantgraph in ['y', 'yes']:
         graph()
+        
     wantadvice = input("\nView CFO advice? (y/n): ").strip().lower()
     if wantadvice in ['y', 'yes']:
         print("\nCFO SUGGESTIONS")
@@ -78,4 +105,5 @@ def dashboard():
             print("Cash Flow Warning: Expenses higher than revenue.")
         elif exptoday > (salestoday * 0.5) and salestoday > 0:
             print("Expense Heavy: Todays expenses are greater than 50 percent of sales.")
+            
     input("\nPress Enter to return")

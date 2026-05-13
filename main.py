@@ -5,7 +5,7 @@ import advisor
 def run():
     setup() 
     while True:
-        print("SWIFTFLOW BUSINESS MANAGER")
+        print("\nSWIFTFLOW BUSINESS MANAGER")
         print("[1] Restock Inventory")
         print("[2] Log Sale")
         print("[3] View Records")

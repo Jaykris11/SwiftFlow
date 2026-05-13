@@ -1,14 +1,28 @@
-import sqlite3
+import mysql.connector
 
 def connect():
-    conn = sqlite3.connect('swiftflow.db')
-    conn.row_factory = sqlite3.Row
+    tempdb = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password=""
+    )
+    tempcursor = tempdb.cursor()
+    tempcursor.execute("CREATE DATABASE IF NOT EXISTS swiftflow")
+    tempdb.close()
+    
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="swiftflow"
+    )
     return conn
 
 def setup():
     conn = connect()
-    conn.execute('CREATE TABLE IF NOT EXISTS inventory (item TEXT PRIMARY KEY, qty INTEGER, cost REAL, price REAL)')
-    conn.execute('CREATE TABLE IF NOT EXISTS sales (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, item TEXT, qty INTEGER, totalcost REAL, totalrevenue REAL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)')
-    conn.execute('CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, description TEXT, amount REAL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)')
+    cursor = conn.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS inventory (item VARCHAR(255) PRIMARY KEY, qty INT, cost DECIMAL(10,2), price DECIMAL(10,2))')
+    cursor.execute('CREATE TABLE IF NOT EXISTS sales (id INT AUTO_INCREMENT PRIMARY KEY, date VARCHAR(255), item VARCHAR(255), qty INT, totalcost DECIMAL(10,2), totalrevenue DECIMAL(10,2), timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS expenses (id INT AUTO_INCREMENT PRIMARY KEY, date VARCHAR(255), description VARCHAR(255), amount DECIMAL(10,2), timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
     conn.commit()
     conn.close()
