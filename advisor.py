@@ -1,66 +1,81 @@
-from database import get_db
+from database import connect
 from datetime import datetime
+import plotext as plt
 
-def generate_financial_statement():
-    today = datetime.now().strftime("%Y-%m-%d")
-    conn = get_db()
-    
-    # Gather Data
-    sales_today = conn.execute('SELECT SUM(total_revenue) FROM sales WHERE date = ?', (today,)).fetchone()[0] or 0.0
-    cost_today = conn.execute('SELECT SUM(total_cost) FROM sales WHERE date = ?', (today,)).fetchone()[0] or 0.0
-    exp_today = conn.execute('SELECT SUM(amount) FROM expenses WHERE date = ?', (today,)).fetchone()[0] or 0.0
-    net_profit = sales_today - (cost_today + exp_today)
-    
-    tot_exp = conn.execute('SELECT SUM(amount) FROM expenses').fetchone()[0] or 0.0
-    tot_rev = conn.execute('SELECT SUM(total_revenue) FROM sales').fetchone()[0] or 0.0
-    tot_cost = conn.execute('SELECT SUM(total_cost) FROM sales').fetchone()[0] or 0.0
-    overall_profit = tot_rev - (tot_cost + tot_exp)
-    
-
-    print(" SMART ADVISOR: FINANCIAL DASHBOARD")
-    
-    print("\nTODAY'S STATEMENT")
-    print(f"  + Gross Sales:  ₱{sales_today:.2f}")
-    print(f"  - Product Cost: ₱{cost_today:.2f}")
-    print(f"  - Expenses:     ₱{exp_today:.2f}")
-    print(f"  = Net Profit:   ₱{net_profit:.2f}")
-
-    print("\nOVERALL BUSINESS HEALTH")
-    print(f"  Lifetime Revenue: ₱{tot_rev:.2f}")
-    print(f"  Lifetime Profit:  ₱{overall_profit:.2f}")
-    if tot_rev > 0:
-        print(f"  Overall Margin:   {((tot_rev - tot_cost) / tot_rev) * 100:.1f}%")
-    
-   
-    want_advice = input("\nWould you like financial advice based on your statements? (y/n): ").strip().lower()
-    if want_advice in ['y', 'yes', 'yeah', 'yep']:
-        print("\nCFO SUGGESTIONS & INSIGHTS")
-        
-       
-        if tot_rev > 0:
-            margin = ((tot_rev - tot_cost) / tot_rev) * 100
-            if margin < 30:
-                print("MARGIN ALERT: Your profit margins are below 30%. Consider raising your selling prices or finding cheaper ingredient suppliers.")
-            elif margin >= 50:
-                print("EXCELLENT MARGINS: You are keeping over 50% of your sales revenue. Your pricing strategy is perfect.")
-            else:
-                print("HEALTHY MARGINS: Your pricing is stable. Focus on increasing daily sales volume.")
-                
-       
-        if tot_exp > tot_rev:
-            print("CASH FLOW WARNING: Your overall expenses are higher than your revenue. Cut back on non-essential expenses immediately until sales pick up.")
-        elif exp_today > (sales_today * 0.5) and sales_today > 0:
-            print("DAILY EXPENSE HEAVY: Today's expenses ate up more than half your sales. Ensure these are bulk/restock expenses and not daily burn.")
-            
-       
-        low_stock = conn.execute('SELECT item, qty FROM inventory WHERE qty < 10').fetchall()
-        if low_stock:
-            print("LOW STOCK WARNING: The following items are running out and need restocking soon:")
-            for item in low_stock:
-                print(f"{item['item']} (Only {item['qty']} left)")
-        else:
-            print("INVENTORY HEALTHY: You have plenty of stock for all items.")
-            
+def graph():
+    print("\nSALES GRAPH")
+    print("[1] Past 7 Days")
+    print("[2] Past 30 Days")
+    print("[3] Past 12 Months")
+    choice = input("Select timeframe: ")
+    conn = connect()
+    if choice == '1':
+        query = "SELECT date, SUM(totalrevenue) as rev FROM sales WHERE date >= date('now', '-7 days') GROUP BY date ORDER BY date"
+        title = "Revenue Past 7 Days"
+    elif choice == '2':
+        query = "SELECT date, SUM(totalrevenue) as rev FROM sales WHERE date >= date('now', '-30 days') GROUP BY date ORDER BY date"
+        title = "Revenue Past 30 Days"
+    elif choice == '3':
+        query = "SELECT strftime('%Y-%m', date) as date, SUM(totalrevenue) as rev FROM sales WHERE date >= date('now', '-1 year') GROUP BY strftime('%Y-%m', date) ORDER BY date"
+        title = "Revenue Past 12 Months"
+    else:
+        print("Invalid choice")
+        conn.close()
+        return
+    rows = conn.execute(query).fetchall()
     conn.close()
-    input("\nPress Enter to return to the Main Menu...")
+    if not rows:
+        print("No data for timeframe")
+        return
+    dates = [row['date'][-5:] for row in rows]
+    revenues = [row['rev'] for row in rows]
+    plt.clf()
+    plt.bar(dates, revenues, color="cyan")
+    plt.title(title)
+    plt.xlabel("Date")
+    plt.ylabel("Revenue")
+    plt.theme("dark")
+    plt.show()
 
+def dashboard():
+    today = datetime.now().strftime("%Y-%m-%d")
+    conn = connect()
+    salestoday = conn.execute('SELECT SUM(totalrevenue) FROM sales WHERE date = ?', (today,)).fetchone()[0] or 0.0
+    costtoday = conn.execute('SELECT SUM(totalcost) FROM sales WHERE date = ?', (today,)).fetchone()[0] or 0.0
+    exptoday = conn.execute('SELECT SUM(amount) FROM expenses WHERE date = ?', (today,)).fetchone()[0] or 0.0
+    netprofit = salestoday - (costtoday + exptoday)
+    totexp = conn.execute('SELECT SUM(amount) FROM expenses').fetchone()[0] or 0.0
+    totrev = conn.execute('SELECT SUM(totalrevenue) FROM sales').fetchone()[0] or 0.0
+    totcost = conn.execute('SELECT SUM(totalcost) FROM sales').fetchone()[0] or 0.0
+    overallprofit = totrev - (totcost + totexp)
+    conn.close()
+    print("\nFINANCIAL DASHBOARD")
+    print("\nTODAYS STATEMENT")
+    print(f"Gross Sales: {salestoday:.2f}")
+    print(f"Product Cost: {costtoday:.2f}")
+    print(f"Expenses: {exptoday:.2f}")
+    print(f"Net Profit: {netprofit:.2f}")
+    print("\nOVERALL BUSINESS HEALTH")
+    print(f"Lifetime Revenue: {totrev:.2f}")
+    print(f"Lifetime Profit: {overallprofit:.2f}")
+    if totrev > 0:
+        print(f"Overall Margin: {((totrev - totcost) / totrev) * 100:.1f}%")
+    wantgraph = input("\nView Sales Graph? (y/n): ").strip().lower()
+    if wantgraph in ['y', 'yes']:
+        graph()
+    wantadvice = input("\nView CFO advice? (y/n): ").strip().lower()
+    if wantadvice in ['y', 'yes']:
+        print("\nCFO SUGGESTIONS")
+        if totrev > 0:
+            margin = ((totrev - totcost) / totrev) * 100
+            if margin < 30: 
+                print("Margin Alert: Profit margins below 30 percent. Consider raising prices.")
+            elif margin >= 50: 
+                print("Excellent Margins: Keeping over 50 percent of revenue.")
+            else: 
+                print("Healthy Margins: Pricing is stable.")
+        if totexp > totrev:
+            print("Cash Flow Warning: Expenses higher than revenue.")
+        elif exptoday > (salestoday * 0.5) and salestoday > 0:
+            print("Expense Heavy: Todays expenses are greater than 50 percent of sales.")
+    input("\nPress Enter to return")
