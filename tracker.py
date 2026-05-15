@@ -78,24 +78,72 @@ def sell():
 
 def history():
     print("\nFINANCIAL RECORDS")
+    print("[1] All Records")
+    print("[2] Search by Keyword")
+    print("[3] Filter by Date")
+    choice = input("Select view: ")
+    
     conn = connect()
     cursor = conn.cursor(dictionary=True)
     
-    print("\nSALES")
-    cursor.execute('SELECT * FROM sales ORDER BY timestamp DESC')
-    sales = cursor.fetchall()
-    if not sales: 
-        print("No sales")
-    for s in sales:
-        print(f"[{s['date']}] Sold {s['qty']}x {s['item']} | Rev: {s['totalrevenue']} | Cost: {s['totalcost']}")
+    if choice == '1':
+        print("\nSALES")
+        cursor.execute('SELECT * FROM sales ORDER BY timestamp DESC')
+        sales = cursor.fetchall()
+        if not sales: 
+            print("No sales")
+        for s in sales:
+            print(f"[{s['date']}] Sold {s['qty']}x {s['item']} | Rev: {s['totalrevenue']} | Cost: {s['totalcost']}")
+            
+        print("\nEXPENSES")
+        cursor.execute('SELECT * FROM expenses ORDER BY timestamp DESC')
+        expenses = cursor.fetchall()
+        if not expenses: 
+            print("No expenses")
+        for e in expenses:
+            print(f"[{e['date']}] {e['description']} | Amount: {e['amount']}")
+            
+    elif choice == '2':
+        term = input("Enter keyword: ")
+        searchterm = f"%{term}%"
         
-    print("\nEXPENSES")
-    cursor.execute('SELECT * FROM expenses ORDER BY timestamp DESC')
-    expenses = cursor.fetchall()
-    if not expenses: 
-        print("No expenses")
-    for e in expenses:
-        print(f"[{e['date']}] {e['description']} | Amount: {e['amount']}")
+        print("\nSALES RESULTS")
+        cursor.execute('SELECT * FROM sales WHERE item LIKE %s ORDER BY timestamp DESC', (searchterm,))
+        sales = cursor.fetchall()
+        if not sales: 
+            print("No sales found")
+        for s in sales:
+            print(f"[{s['date']}] Sold {s['qty']}x {s['item']} | Rev: {s['totalrevenue']} | Cost: {s['totalcost']}")
+            
+        print("\nEXPENSE RESULTS")
+        cursor.execute('SELECT * FROM expenses WHERE description LIKE %s ORDER BY timestamp DESC', (searchterm,))
+        expenses = cursor.fetchall()
+        if not expenses: 
+            print("No expenses found")
+        for e in expenses:
+            print(f"[{e['date']}] {e['description']} | Amount: {e['amount']}")
+            
+    elif choice == '3':
+        targetdate = input("Enter date (YYYY-MM-DD): ")
+        
+        print("\nSALES RESULTS")
+        cursor.execute('SELECT * FROM sales WHERE date = %s ORDER BY timestamp DESC', (targetdate,))
+        sales = cursor.fetchall()
+        if not sales: 
+            print("No sales found")
+        for s in sales:
+            print(f"[{s['date']}] Sold {s['qty']}x {s['item']} | Rev: {s['totalrevenue']} | Cost: {s['totalcost']}")
+            
+        print("\nEXPENSE RESULTS")
+        cursor.execute('SELECT * FROM expenses WHERE date = %s ORDER BY timestamp DESC', (targetdate,))
+        expenses = cursor.fetchall()
+        if not expenses: 
+            print("No expenses found")
+        for e in expenses:
+            print(f"[{e['date']}] {e['description']} | Amount: {e['amount']}")
+            
+    else:
+        print("Invalid choice")
         
     conn.close()
     input("\nPress Enter to return")
